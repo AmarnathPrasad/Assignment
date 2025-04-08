@@ -2,7 +2,11 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Permissions to use the external content provider -->
     <uses-permission android:name="com.iav.contestdataprovider.READ" />
+    <uses-permission android:name="com.iav.contestdataprovider.WRITE" />
 
 
     <application

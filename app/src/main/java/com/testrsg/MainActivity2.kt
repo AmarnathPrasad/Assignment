@@ -1,85 +1,127 @@
 package com.testrsg
 
-import android.os.Bundle
-import android.widget.Button
-import android.widget.EditText
-import android.widget.LinearLayout
-import android.widget.TextView
-import android.widget.Toast
-import com.google.android.material.snackbar.Snackbar
+import android.content.ContentResolver
+import android.database.Cursor
+import android.net.Uri
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
-import androidx.navigation.findNavController
-import androidx.navigation.ui.AppBarConfiguration
-import androidx.navigation.ui.navigateUp
-import androidx.navigation.ui.setupActionBarWithNavController
+import android.os.Bundle
+import android.util.Log
+import android.widget.Toast
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.testrsg.databinding.ActivityMainBinding
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 class MainActivity2 : AppCompatActivity() {
 
-    private lateinit var appBarConfiguration: AppBarConfiguration
     private lateinit var binding: ActivityMainBinding
+    private lateinit var adapter: RandomStringAdapter
 
-    private lateinit var inputLength: EditText
-    private lateinit var fetchButton: Button
-    private lateinit var resultText: TextView
-
-    private lateinit var repository: RandomStringRepository
+    private val contentProviderUri: Uri =
+        Uri.parse("content://com.iav.contestdataprovider/text")
+    private val dataColumnName = "data"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-       // binding = ActivityMainBinding.inflate(layoutInflater)
-       // setContentView(binding.root)
-       // setSupportActionBar(binding.toolbar)
+        binding = ActivityMainBinding.inflate(layoutInflater)
+        setContentView(binding.root)
 
-        repository = RandomStringRepository(this)
-
-        val layout = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(40, 80, 40, 80)
+        adapter = RandomStringAdapter(mutableListOf()) { position ->
+            adapter.removeAt(position)
         }
+        binding.rvRandomStrings.layoutManager = LinearLayoutManager(this)
+        binding.rvRandomStrings.adapter = adapter
 
-        inputLength = EditText(this).apply {
-            hint = "Max length"
-            inputType = android.text.InputType.TYPE_CLASS_NUMBER
-        }
-
-        fetchButton = Button(this).apply {
-            text = "Fetch Random String"
-        }
-
-        resultText = TextView(this).apply {
-            textSize = 16f
-        }
-
-        layout.apply {
-            addView(inputLength)
-            addView(fetchButton)
-            addView(resultText)
-        }
-
-        setContentView(layout)
-
-        fetchButton.setOnClickListener {
-            val maxLength = inputLength.text.toString().toIntOrNull()
-            if (maxLength != null && maxLength > 0) {
-                lifecycleScope.launch {
-                    resultText.text = "Fetching..."
-                    val result = repository.getRandomString(maxLength)
-                    result.fold(
-                        onSuccess = {
-                            resultText.text = "Value: ${it.value}\nLength: ${it.length}\nCreated: ${it.created}"
-                        },
-                        onFailure = {
-                            resultText.text = "Error: ${it.message}"
-                        }
-                    )
-                }
+        binding.btnGenerate.setOnClickListener {
+            val lengthString = binding.etMaxLength.text.toString()
+            if (lengthString.isBlank()) {
+                Toast.makeText(this, "Please enter a valid length", Toast.LENGTH_SHORT).show()
             } else {
-                Toast.makeText(this, "Please enter a valid number", Toast.LENGTH_SHORT).show()
+                val maxLength = lengthString.toIntOrNull()
+                if (maxLength == null || maxLength <= 0) {
+                    Toast.makeText(this, "Length must be a positive number", Toast.LENGTH_SHORT)
+                        .show()
+                } else {
+                    fetchRandomString(maxLength)
+                }
             }
+        }
+
+        binding.btnClearAll.setOnClickListener {
+            adapter.clearAll()
+        }
+    }
+
+    private fun fetchRandomString(maxLength: Int) {
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+
+                val queryArgs = Bundle().apply {
+                    putInt(ContentResolver.QUERY_ARG_LIMIT, maxLength)
+                }
+                val cursor: Cursor? = contentResolver.query(
+                    contentProviderUri,  // URI
+                    null,                // projection; we assume the provider returns all columns
+                    null,                // selection
+                    null,                // selectionArgs
+                    null,                // sort order
+                  //  queryArgs
+                    null
+                )
+                // Cursor may be null or the provider might work slowly / be unreliable
+                if (cursor != null && cursor.moveToFirst()) {
+                    val jsonData = cursor.getString(cursor.getColumnIndexOrThrow(dataColumnName))
+                    cursor.close()
+
+                    // Parse the JSON data
+                    val randomStringData = parseJson(randomStringData = jsonData)
+                    withContext(Dispatchers.Main) {
+                        if (randomStringData != null) {
+                            adapter.addItem(randomStringData)
+                        } else {
+                            Toast.makeText(
+                                this@MainActivity2,
+                                "Error: Unable to parse response",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(
+                            this@MainActivity2,
+                            "Error: No response from content provider",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e("MainActivity", "Error querying content provider", e)
+                withContext(Dispatchers.Main) {
+                    Toast.makeText(
+                        this@MainActivity2,
+                        "Error: ${e.localizedMessage}",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun parseJson(randomStringData: String): RandomStringData? {
+        return try {
+            val jsonObject = JSONObject(randomStringData)
+            val randomText = jsonObject.getJSONObject("randomText")
+            val value = randomText.getString("value")
+            val length = randomText.getInt("length")
+            val created = randomText.getString("created")
+            RandomStringData(value = value, length = length, created = created)
+        } catch (e: Exception) {
+            Log.e("ParseJSON", "Error parsing JSON", e)
+            null
         }
     }
 }
