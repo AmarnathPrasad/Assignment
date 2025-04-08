@@ -10,7 +10,7 @@ android {
 
     defaultConfig {
         applicationId = "com.testrsg"
-        minSdk = 21
+        minSdk = 24
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
@@ -55,7 +55,7 @@ dependencies {
     implementation(libs.androidx.constraintlayout)
     implementation(libs.androidx.navigation.fragment.ktx)
     implementation(libs.androidx.navigation.ui.ktx)
-    implementation(libs.recyclerview.v7)
+    //implementation(libs.recyclerview.v7)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -67,6 +67,6 @@ dependencies {
     implementation(libs.gson)
     implementation(libs.kotlinx.coroutines.android)
 
-    implementation(libs.androidx.constraintlayout.v214)
+    //implementation(libs.androidx.constraintlayout.v214)
     //implementation("androidx.recyclerview:recyclerview:1.3.0")
 }

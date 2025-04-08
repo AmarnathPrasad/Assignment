@@ -3,6 +3,7 @@ package com.testrsg
 import android.content.ContentResolver
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
@@ -62,22 +63,39 @@ class MainActivity2 : AppCompatActivity() {
                 val queryArgs = Bundle().apply {
                     putInt(ContentResolver.QUERY_ARG_LIMIT, maxLength)
                 }
-                val cursor: Cursor? = contentResolver.query(
-                    contentProviderUri,  // URI
-                    null,                // projection; we assume the provider returns all columns
-                    null,                // selection
-                    null,                // selectionArgs
-                    null,                // sort order
-                  //  queryArgs
-                    null
-                )
+                /*  val cursor: Cursor? = contentResolver.query(
+                      contentProviderUri,  // URI
+                      null,                // projection; we assume the provider returns all columns
+                      null,                // selection
+                      null,                // selectionArgs
+                      null,                // sort order
+                      queryArgs
+                  )*/
+
+                val cursor: Cursor? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    contentResolver.query(
+                        contentProviderUri,
+                        null,               // projection
+                        queryArgs,          // bundle-based queryArgs (correct position!)
+                        null                // cancellationSignal (optional)
+                    )
+                } else {
+                    // Fallback for older APIs — if needed
+                    contentResolver.query(
+                        contentProviderUri,
+                        null,
+                        null,
+                        null,
+                        null
+                    )
+                }
                 // Cursor may be null or the provider might work slowly / be unreliable
                 if (cursor != null && cursor.moveToFirst()) {
                     val jsonData = cursor.getString(cursor.getColumnIndexOrThrow(dataColumnName))
                     cursor.close()
 
                     // Parse the JSON data
-                    val randomStringData = parseJson(randomStringData = jsonData)
+                    val randomStringData =parseJson(randomStringData = jsonData)
                     withContext(Dispatchers.Main) {
                         if (randomStringData != null) {
                             adapter.addItem(randomStringData)
